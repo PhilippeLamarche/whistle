@@ -24,6 +24,16 @@ const double MAXFREQUENCY      = 20000.0;
 const int    TIMEPRECISION     = 6      ; //Microseconds (10^-6 seconds)
 const int    RANDPOSSIBILITIES = 1000   ; //Number of possibiles for a random draw
 
+//   vvvvvvvvPID Constantsvvvvvvvv
+const double FREQ_P = 30;
+const double FREQ_I = 10;
+const double FREQ_D = 10;
+
+const double AMP_P = 60;
+const double AMP_I = 10;
+const double AMP_D = 10;
+//   ^^^^^^^^PID Constants^^^^^^^^
+
 
 double round(double valueToRound,int precision);
 bool   dividedByZero(double value);
@@ -114,11 +124,7 @@ void Whistle::updateFreqFromKey(double* freq)
 
     updateKeysInTime(&m_freqKeysList);
 
-
-    if(m_lastFreqKey.value>(*freq))
-        (*freq)++;
-    else if(m_lastFreqKey.value<(*freq))
-        (*freq)--;
+    (*freq) += (m_lastFreqKey.value-(*freq)) / FREQ_P;
 }
 
 void Whistle::updateAmpAndTremorFromKey(double* amp)
@@ -129,10 +135,7 @@ void Whistle::updateAmpAndTremorFromKey(double* amp)
     updateKeysInTime(&m_ampKeysList);
     updateKeysInTime(&m_tremorKeysList);
 
-    if(m_lastAmpKey.value>(*amp))
-        (*amp)+=0.01;
-    else if(m_lastAmpKey.value<(*amp))
-        (*amp)-=0.01;
+    (*amp) += (m_lastAmpKey.value-(*amp)) / AMP_P;
 }
 
 void Whistle::updateKeysInTime(whistleKeysList_t* keysList)
@@ -160,10 +163,6 @@ void Whistle::updateKeysInTime(whistleKeysList_t* keysList)
 
 void Whistle::addImperfection(double* freq, double* amp)
 {
-    double imperfectTremorMean     = (*amp) - m_imperfectTremorAmpDiff/2,
-           imperfectTremorProgress = 0;
-
-
     if(m_elapsedTime >= m_finalImperfectTremorTime)
     {
         m_imperfectTremorAmpDiff = randFrom0To1() * m_imperfectTremorDepth;
@@ -171,9 +170,10 @@ void Whistle::addImperfection(double* freq, double* amp)
         m_finalImperfectTremorTime = m_initialImperfectTremorTime + (m_imperfectTremorLengthMin + ( randFrom0To1() * m_imperfectTremorLengthRand ));
     }
 
-    imperfectTremorProgress = (m_elapsedTime-m_initialImperfectTremorTime) / (m_finalImperfectTremorTime-m_initialImperfectTremorTime);
+    double imperfectTremorMean     = (*amp) - m_imperfectTremorAmpDiff/2,
+           imperfectTremorProgress = (m_elapsedTime-m_initialImperfectTremorTime) / (m_finalImperfectTremorTime-m_initialImperfectTremorTime);
 
-    double modAmp  = (m_imperfectTremorAmpDiff * cos(2*M_PI * imperfectTremorProgress)/2 + imperfectTremorMean);
+    double modAmp  = m_imperfectTremorAmpDiff * cos(2*M_PI * imperfectTremorProgress)/2 + imperfectTremorMean;
     double modFreq = (*freq) + (randFromMinus1To1() * m_imperfectTremorFreqShift) - ( ((*amp)-modAmp) * m_imperfectTremorFreqShift / m_imperfectTremorDepth );
 
     clamp(0,&modAmp,1);
