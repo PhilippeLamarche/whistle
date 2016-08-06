@@ -47,12 +47,15 @@ class Whistle
         inline void writeToStream(const bool setter) { m_writeToStream = setter; }
         inline bool verbose() const { return m_verbose; }
         inline void verbose(const bool setter) { m_verbose = setter; }
+        inline bool secondHarmonicRelativeAmp() const { return m_secondHarmonicAmp; }
+        inline void secondHarmonicRelativeAmp(const double setter) { m_secondHarmonicAmp = setter; }
 
     private:
         void addImperfection(double* freq, double* amp);
         void updateFreqFromKey(double* freq);
         void updateAmpAndTremorFromKey(double* amp);
 
+        int16_t getSound(double freq, double amp, double sampleUnit);
         void oneCycle(double freq, double amp);
         void playTone(double freq, double amp, double length);
         void print(int16_t a);
@@ -82,6 +85,8 @@ class Whistle
         bool   m_addNoise                 ;
         double m_noiseAmp                 ; // between 0 and 1
 
+        double m_secondHarmonicAmp        ; // between 0 and 1. Represent the fraction of amp relative to the main harmonic
+
         unsigned int m_sampling ;
         int16_t      m_maxVolume;
 
@@ -97,7 +102,8 @@ class Whistle
 
 //  internal:
         double m_elapsedTime; // in microseconds
-        double m_offsetY    ; // between 0 and 1 This holds the last value that has been printed. It enables the cycles to be perfectly synced
+        double m_offsetX    ; // between 0 and 1 This holds the overflow time of the last cycle. It allows the cycles to be perfectly synced
+        double m_offsetY    ; // between 0 and 1 This holds the last value that has been printed. It allows the cycles to be perfectly synced
 
         double m_initialImperfectTremorTime; //This holds the time from when an imperfect tremor (unplanned) is happenning
         double m_finalImperfectTremorTime  ; //This holds the time until when an imperfect tremor should happen

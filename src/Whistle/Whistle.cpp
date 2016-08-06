@@ -59,12 +59,14 @@ Whistle::Whistle(const double imperfectTremorFreqShift, const double imperfectTr
     m_fadeOutTime               (fadeOutTime),
     m_addNoise                  (false),
     m_noiseAmp                  (0.005),
+    m_secondHarmonicAmp         (0.1),
     m_sampling                  (44100),
     m_maxVolume                 (32767),
     m_writeToFile               (false),
     m_writeToStream             (false),
     m_verbose                   (false),
     m_elapsedTime               (0),
+    m_offsetX                   (0),
     m_offsetY                   (0),
     m_initialImperfectTremorTime(0),
     m_finalImperfectTremorTime  (0),
@@ -246,26 +248,33 @@ void Whistle::blowOneNote(double freq, double amp, double length)
 }
 
 
+int16_t Whistle::getSound(double freq, double amp, double sampleUnit)
+{
+    return ((m_maxVolume * amp * sin( (sampleUnit + m_offsetX*m_sampling) * 2*M_PI * freq / m_sampling ) )/*1st Harmonic*/ +
+            (m_maxVolume * amp*m_secondHarmonicAmp * sin( (sampleUnit + m_offsetX*m_sampling) * 2*M_PI * 2*freq / m_sampling ) ))/*2nd Harmonic*/ / (1+m_secondHarmonicAmp);//normalized to amp
+}
+
+
 void Whistle::oneCycle(double freq, double amp)
 {
     assertAndClampFrequency(&freq);
     assertAndClampAmplitude(&amp);
 
-    double offset = ( asin(m_offsetY / amp) * m_sampling ) / ( 2*M_PI * freq );
-    if( dividedByZero(offset) ) //In case amp is very close or exactly 0.
-        offset=0;
-
-
     int16_t tempSound;
+
     double sampleUnit=0;
-    for(;sampleUnit<m_sampling/freq-int(offset);sampleUnit++)
+    for(;sampleUnit<(1/freq-m_offsetX)*m_sampling;sampleUnit++)
     {
-        tempSound  = m_maxVolume * amp * sin( (sampleUnit+offset) * 2*M_PI / m_sampling * freq );
+        tempSound  = getSound(freq, amp, sampleUnit);
         print(tempSound);
     }
 
     m_elapsedTime += sampleUnit / m_sampling;
-    m_offsetY = amp * sin( (sampleUnit+offset) * 2*M_PI / m_sampling * freq);
+    int16_t nextSound = getSound(freq, amp, sampleUnit);
+
+    //Now we interpol or extrapol to find the time offset too much or missing
+    double slope = double(nextSound-tempSound) / (1/double(m_sampling));
+    m_offsetX = nextSound/slope;
 }
 
 

@@ -12,7 +12,7 @@ const char* NOTE_NAME[12]={"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"}
 
 
 const int    TREMOR_FREQ_SHIFT  = 10   ; // in Hz (maybe not ideal. could be in %Hz, needs verification)
-const double TREMOR_LENGTH_MIN  = 0.120; // in seconds
+const double TREMOR_LENGTH_MIN  = 0.240; // in seconds
 const double TREMOR_LENGTH_RAND = 0.100; // in seconds
 const double TREMOR_DEPTH       = 0.200; // between 0 and 1
 const double AMPLITUDE_DEPTH    = 0.200; // between 0 and 1
@@ -24,18 +24,20 @@ using namespace std;
 
 void zelda(Whistle& whistle);
 void tune1(Whistle& whistle);
+void stepTest(Whistle& whistle);
 
 
 int main(int argc, char** argv)
 {
     Whistle whistle(TREMOR_FREQ_SHIFT, TREMOR_LENGTH_MIN, TREMOR_LENGTH_RAND, TREMOR_DEPTH, AMPLITUDE_DEPTH, FADEIN_TIME, FADEOUT_TIME);
     //whistle.verbose(true);
-    //whistle.addNoise(true);
+    whistle.addNoise(true);
+    whistle.secondHarmonicRelativeAmp(0.01);
     whistle.writeToStream(false);
     whistle.activateWriteToFile("output/out.wav");
 
     //zelda(whistle);
-    tune1(whistle);
+    stepTest(whistle);
 
     whistle.generateWhistle();
 
@@ -43,6 +45,20 @@ int main(int argc, char** argv)
 
     return 0;
 }
+
+void stepTest(Whistle& whistle)
+{
+    double time[] = { 0.0, 0.50, 2.29, 3.00 };
+    double amps[] = { 0.0,  0.8,  0.0,  0.0 };
+    double freq[] = { 900, 1020, 1020, 1020 };
+
+    for(unsigned int i=0;i<sizeof(time)/sizeof(time[0]);i++)
+    {
+        whistle.insertFrequencyKey( time[i], freq[i], INTERPOLATION_STEP_DOWN);
+        whistle.insertAmplitudeKey( time[i], amps[i], INTERPOLATION_STEP_DOWN);
+    }
+}
+
 
 void tune1(Whistle& whistle)
 {
