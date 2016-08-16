@@ -6,6 +6,8 @@
 
 #include "soundfile.h" //To save .wav
 
+//#define USE_CSV
+
 
 
 enum whistleKeyInterpolation{INTERPOLATION_STEP_UP,INTERPOLATION_STEP_DOWN,INTERPOLATION_LINEAR};
@@ -61,7 +63,7 @@ class Whistle
         void print(int16_t a);
 
         void insertKey(double time, double value, whistleKeyInterpolation interpolationType, whistleKeysList_t* keyList);// time is in milliseconds
-        void updateKeysInTime(whistleKeysList_t* keyList);
+        bool updateKeysInTime(whistleKeysList_t* keyList);
 
         int assertAndClampFrequency(double* value) const;
         int assertAndClampAmplitude(double* value) const;
@@ -109,9 +111,19 @@ class Whistle
         double m_finalImperfectTremorTime  ; //This holds the time until when an imperfect tremor should happen
         double m_imperfectTremorAmpDiff    ; //This holds the amount of imperfection in the current imperfect tremor
 
+        double m_PID_curentKp;
+        double m_PID_curentKi;
+        double m_PID_curentKd;
+        double m_PID_Integral;
+        double m_PID_lastError;
+
         WhistleKey m_lastFreqKey  ;
         WhistleKey m_lastAmpKey   ;
         WhistleKey m_lastTremorKey;
+
+#ifdef USE_CSV
+        std::ofstream m_csvOut;
+#endif //#ifdef USE_CSV
 };
 
 
