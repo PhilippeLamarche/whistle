@@ -111,15 +111,24 @@ class Whistle
         double m_finalImperfectTremorTime  ; //This holds the time until when an imperfect tremor should happen
         double m_imperfectTremorAmpDiff    ; //This holds the amount of imperfection in the current imperfect tremor
 
-        double m_PID_curentKp;
-        double m_PID_curentKi;
-        double m_PID_curentKd;
-        double m_PID_Integral;
-        double m_PID_lastError;
+        double m_PIDFreq_curentKp;
+        double m_PIDFreq_curentKi;
+        double m_PIDFreq_curentKd;
+        double m_PIDFreq_Integral;
+        double m_PIDFreq_lastError;
 
-        WhistleKey m_lastFreqKey  ;
-        WhistleKey m_lastAmpKey   ;
-        WhistleKey m_lastTremorKey;
+        double m_PIDAmp_curentKp;
+        double m_PIDAmp_curentKi;
+        double m_PIDAmp_curentKd;
+        double m_PIDAmp_Integral;
+        double m_PIDAmp_lastError;
+
+        WhistleKey m_currentFreqKey   ;
+        WhistleKey m_previousFreqKey  ;
+        WhistleKey m_currentAmpKey    ;
+        WhistleKey m_previousAmpKey   ;
+        WhistleKey m_currentTremorKey ;
+        WhistleKey m_previousTremorKey;
 
 #ifdef USE_CSV
         std::ofstream m_csvOut;

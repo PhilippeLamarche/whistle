@@ -27,16 +27,21 @@ const int    RANDPOSSIBILITIES = 1000   ; //Number of possibiles for a random dr
 
 //   vvvvvvvv - PID Constants - vvvvvvvv
 const double FREQ_Kp =  0.0005;
-const double FREQ_Ki =  0.0000; //Conviniently, this parameter can be though as the overshoot
+const double FREQ_Ki =  0.0000; //Conviniently, this parameter can be though as the overshoot (good in a range of 0 to 0.000004)
 const double FREQ_Kd = -0.9700;
 
 const double FREQ_Kp_RANGE = 0.000000;
-const double FREQ_Ki_RANGE = 0.000000; //Conviniently, this parameter can be though as the overshoot
+const double FREQ_Ki_RANGE = 0.000001; //Conviniently, this parameter can be though as the overshoot (good in a range of 0 to 0.000004)
 const double FREQ_Kd_RANGE = 0.000000;
 
-const double AMP_Kp = 60;
-const double AMP_Ki = 10;
-const double AMP_Kd = 10;
+//The amp PID is strangely used. It is a half-P half-I to create a shape that looks more like a real whistle-volume shape
+const double AMP_Kp = 0.0400;
+const double AMP_Ki = 0.0002;
+const double AMP_Kd = 0.0000;
+
+const double AMP_Kp_RANGE = 0.050000;
+const double AMP_Ki_RANGE = 0.001000;
+const double AMP_Kd_RANGE = 0.000000;
 //   ^^^^^^^^ - PID Constants - ^^^^^^^^
 
 
@@ -76,14 +81,22 @@ Whistle::Whistle(const double imperfectTremorFreqShift, const double imperfectTr
     m_initialImperfectTremorTime(0),
     m_finalImperfectTremorTime  (0),
     m_imperfectTremorAmpDiff    (0),
-    m_PID_curentKp              (0),
-    m_PID_curentKi              (0),
-    m_PID_curentKd              (0),
-    m_PID_Integral              (0),
-    m_PID_lastError             (0),
-    m_lastFreqKey               {0,-1,INTERPOLATION_STEP_UP},
-    m_lastAmpKey                {0,-1,INTERPOLATION_STEP_UP},
-    m_lastTremorKey             {0,-1,INTERPOLATION_STEP_UP}
+    m_PIDFreq_curentKp          (0),
+    m_PIDFreq_curentKi          (0),
+    m_PIDFreq_curentKd          (0),
+    m_PIDFreq_Integral          (0),
+    m_PIDFreq_lastError         (0),
+    m_PIDAmp_curentKp           (0),
+    m_PIDAmp_curentKi           (0),
+    m_PIDAmp_curentKd           (0),
+    m_PIDAmp_Integral           (0),
+    m_PIDAmp_lastError          (0),
+    m_currentFreqKey            {0,-1,INTERPOLATION_STEP_UP},
+    m_previousFreqKey           {0,-1,INTERPOLATION_STEP_UP},
+    m_currentAmpKey             {0,-1,INTERPOLATION_STEP_UP},
+    m_previousAmpKey            {0,-1,INTERPOLATION_STEP_UP},
+    m_currentTremorKey          {0,-1,INTERPOLATION_STEP_UP},
+    m_previousTremorKey         {0,-1,INTERPOLATION_STEP_UP}
 {
     srand(time(0));
 
@@ -140,46 +153,75 @@ void Whistle::generateWhistle()
 
 void Whistle::updateFreqFromKey(double* freq)
 {
-    if(m_lastFreqKey.value==-1) //First time entering
+    if(m_currentFreqKey.value==-1) //First time entering
         (*freq) = m_freqKeysList[0].value;
 
     bool isNewValue = updateKeysInTime(&m_freqKeysList);
 
-    double error = m_lastFreqKey.value-(*freq);
+    double error = m_currentFreqKey.value-(*freq);
     double derivative;
 
     if(isNewValue)
     {
-        m_PID_Integral = 0;
+        m_PIDFreq_Integral = 0;
         derivative = 0;
 
-        m_PID_curentKp = FREQ_Kp + randFrom0To1()*FREQ_Kp_RANGE;
-        m_PID_curentKi = FREQ_Ki + randFrom0To1()*FREQ_Ki_RANGE;
-        m_PID_curentKd = FREQ_Kd + randFrom0To1()*FREQ_Kd_RANGE;
+        m_PIDFreq_curentKp = FREQ_Kp + randFrom0To1()*FREQ_Kp_RANGE;
+        m_PIDFreq_curentKi = FREQ_Ki + randFrom0To1()*FREQ_Ki_RANGE;
+        m_PIDFreq_curentKd = FREQ_Kd + randFrom0To1()*FREQ_Kd_RANGE;
     }
     else
     {
-        m_PID_Integral += error;
-        derivative = error - m_PID_lastError;
+        m_PIDFreq_Integral += error;
+        derivative = error - m_PIDFreq_lastError;
     }
-    m_PID_lastError = error;
+    m_PIDFreq_lastError = error;
 
-    (*freq) += error * m_PID_curentKp + m_PID_Integral * m_PID_curentKi + derivative * m_PID_curentKd;
-
-#ifdef USE_CSV
-    m_csvOut <<"," <<m_lastFreqKey.value <<"," <<(*freq) <<endl;
-#endif //#ifdef USE_CSV
+    (*freq) += error * m_PIDFreq_curentKp + m_PIDFreq_Integral * m_PIDFreq_curentKi + derivative * m_PIDFreq_curentKd;
 }
 
 void Whistle::updateAmpAndTremorFromKey(double* amp)
 {
-    if(m_lastAmpKey.value==-1)
+    if(m_currentAmpKey.value==-1)
         (*amp) = m_ampKeysList[0].value;
 
-    updateKeysInTime(&m_ampKeysList);
+    bool isNewAmpValue = updateKeysInTime(&m_ampKeysList);
     updateKeysInTime(&m_tremorKeysList);
 
-    (*amp) += (m_lastAmpKey.value-(*amp)) / AMP_Kp;
+    double error = m_currentAmpKey.value-(*amp);
+    double derivative;
+
+    if(isNewAmpValue)
+    {
+        m_PIDAmp_Integral = 0;
+        derivative = 0;
+
+        m_PIDAmp_curentKp = AMP_Kp + randFrom0To1()*AMP_Kp_RANGE;
+        m_PIDAmp_curentKi = AMP_Ki + randFrom0To1()*AMP_Ki_RANGE;
+        m_PIDAmp_curentKd = AMP_Kd + randFrom0To1()*AMP_Kd_RANGE;
+    }
+    else
+    {
+        m_PIDAmp_Integral += error;
+        derivative = error - m_PIDAmp_lastError;
+    }
+    m_PIDAmp_lastError = error;
+
+    double completion = ((*amp) - m_previousAmpKey.value)/(m_currentAmpKey.value-m_previousAmpKey.value);
+
+    double kpMutliplyError = 0;
+    if( completion > 0.5 ) //The P is only present at the end of the rise
+        kpMutliplyError = error * m_PIDAmp_curentKp;
+
+    double kiMultiplyIntegral = 0;
+    if( completion < 0.5 ) //The I is only present at the beginning of the rise
+        kiMultiplyIntegral = m_PIDAmp_Integral * m_PIDAmp_curentKi;
+
+    (*amp) += kpMutliplyError + kiMultiplyIntegral + derivative * m_PIDAmp_curentKd;
+
+#ifdef USE_CSV
+    m_csvOut <<"," <<m_currentAmpKey.value <<"," <<(*amp) <<endl;
+#endif //#ifdef USE_CSV
 }
 
 bool Whistle::updateKeysInTime(whistleKeysList_t* keysList)
@@ -189,26 +231,32 @@ bool Whistle::updateKeysInTime(whistleKeysList_t* keysList)
     {
         if( m_elapsedTime >= (*keysList)[0].time )
         {
+            WhistleKey *currentKey, *previousKey;
+
             if(keysList==&m_freqKeysList)
             {
-                differentValue = m_lastFreqKey.value != (*keysList)[0].value;
-                m_lastFreqKey = (*keysList)[0];
+                currentKey  = &m_currentFreqKey;
+                previousKey = &m_previousFreqKey;
             }
             else if(keysList==&m_ampKeysList)
             {
-                differentValue = m_lastAmpKey.value != (*keysList)[0].value;
-                m_lastAmpKey = (*keysList)[0];
+                currentKey =  &m_currentAmpKey;
+                previousKey = &m_previousAmpKey;
             }
             else if(keysList==&m_tremorKeysList)
             {
-                differentValue = m_lastTremorKey.value != (*keysList)[0].value;
-                m_lastTremorKey = (*keysList)[0];
+                currentKey =  &m_currentTremorKey;
+                previousKey = &m_previousTremorKey;
             }
             else
             {
                 cerr <<"Error: KeysList unrecongnized in updateKeysInTime(whistleKeysList_t* keysList)" <<endl;
                 return false;
             }
+
+            differentValue = currentKey->value != (*keysList)[0].value;
+            (*previousKey) = (*currentKey);
+            (*currentKey) = (*keysList)[0];
 
             keysList->erase(keysList->begin());
 

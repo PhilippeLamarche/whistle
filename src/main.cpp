@@ -25,6 +25,7 @@ using namespace std;
 void zelda(Whistle& whistle);
 void tune1(Whistle& whistle);
 void stepTest(Whistle& whistle);
+void musicalScale(Whistle& whistle);
 
 
 int main(int argc, char** argv)
@@ -38,13 +39,31 @@ int main(int argc, char** argv)
 
     //zelda(whistle);
     //stepTest(whistle);
-    tune1(whistle);
+    //tune1(whistle);
+    musicalScale(whistle);
 
     whistle.generateWhistle();
 
     whistle.closeFile();
 
     return 0;
+}
+
+void musicalScale(Whistle& whistle)
+{
+    double time[] = {  0.0, 0.41, 0.73, 0.88, 1.16, 1.35, 1.68, 1.86, 2.17, 2.31, 2.63, 2.84, 3.21, 3.42, 3.96, 4.505 };
+    double amps[] = {  0.0,  0.4,  0.0,  0.9,  0.0,  0.2,  0.0,  0.2,  0.0,  0.2,  0.0,  0.5,  0.0,  0.3,  0.0,   0.0 };
+    double freq[] = {  885,  885, 1109, 1109, 1319, 1319, 1760, 1760, 1319, 1319, 1109, 1109,  880,  880,  880,   880 };
+    //double freq[] = {  880,  880,  880, 1109, 1109, 1319, 1319, 1760, 1760, 1319, 1319, 1109, 1109,  880,  880,   880 };
+
+    for(unsigned int i=0;i<sizeof(time)/sizeof(time[0]);i++)
+    {
+        if(i==0)
+            whistle.insertFrequencyKey( time[i], freq[i], INTERPOLATION_STEP_DOWN);
+        else
+            whistle.insertFrequencyKey( time[i]+0.07, freq[i], INTERPOLATION_STEP_DOWN);
+        whistle.insertAmplitudeKey( time[i], amps[i], INTERPOLATION_STEP_DOWN);
+    }
 }
 
 void stepTest(Whistle& whistle)
