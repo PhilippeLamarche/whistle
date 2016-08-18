@@ -34,6 +34,8 @@ const double FREQ_Kp_RANGE = 0.000000;
 const double FREQ_Ki_RANGE = 0.000001; //Conviniently, this parameter can be though as the overshoot (good in a range of 0 to 0.000004)
 const double FREQ_Kd_RANGE = 0.000000;
 
+const double PID_NO_OVERSHOOT_BEFORE = 0.05; //Between 0 and 1. Corresponds to a threshold measured on completion between the two surrouding keys
+
 //The amp PID is strangely used. It is a half-P half-I to create a shape that looks more like a real whistle-volume shape
 const double AMP_Kp = 0.0400;
 const double AMP_Ki = 0.0002;
@@ -91,12 +93,15 @@ Whistle::Whistle(const double imperfectTremorFreqShift, const double imperfectTr
     m_PIDAmp_curentKd           (0),
     m_PIDAmp_Integral           (0),
     m_PIDAmp_lastError          (0),
-    m_currentFreqKey            {0,-1,INTERPOLATION_STEP_UP},
-    m_previousFreqKey           {0,-1,INTERPOLATION_STEP_UP},
-    m_currentAmpKey             {0,-1,INTERPOLATION_STEP_UP},
-    m_previousAmpKey            {0,-1,INTERPOLATION_STEP_UP},
-    m_currentTremorKey          {0,-1,INTERPOLATION_STEP_UP},
-    m_previousTremorKey         {0,-1,INTERPOLATION_STEP_UP}
+    m_nextFreqKey               {0,-1,INTERPOLATION_STEPS},
+    m_currentFreqKey            {0,-1,INTERPOLATION_STEPS},
+    m_previousFreqKey           {0,-1,INTERPOLATION_STEPS},
+    m_nextAmpKey                {0,-1,INTERPOLATION_STEPS},
+    m_currentAmpKey             {0,-1,INTERPOLATION_STEPS},
+    m_previousAmpKey            {0,-1,INTERPOLATION_STEPS},
+    m_nextTremorKey             {0,-1,INTERPOLATION_STEPS},
+    m_currentTremorKey          {0,-1,INTERPOLATION_STEPS},
+    m_previousTremorKey         {0,-1,INTERPOLATION_STEPS}
 {
     srand(time(0));
 
@@ -113,19 +118,16 @@ void Whistle::generateWhistle()
     if(m_verbose)
         cout <<"Whistle Generation Beginning!" <<endl;
 
-
-//--------------------------------------------------------------------------------------------------------------------------------------
+    if(m_freqKeysList.size()<=0)
+        m_freqKeysList.push_back({0.0,880.0,INTERPOLATION_STEPS});
+    if(m_ampKeysList.size()<=0)
+        m_ampKeysList.push_back({0.0,1.0,INTERPOLATION_STEPS});
+    if(m_tremorKeysList.size()<=0)
+        m_tremorKeysList.push_back({0.0,0.0,INTERPOLATION_STEPS});
 
     double finalTime = 0.0,
            freq      = 0.0,
            amp       = 0.0;
-
-    if(m_freqKeysList.size()<=0)
-        m_freqKeysList.push_back({0.0,880.0,INTERPOLATION_STEP_DOWN});
-    if(m_ampKeysList.size()<=0)
-        m_ampKeysList.push_back({0.0,1.0,INTERPOLATION_STEP_DOWN});
-    if(m_tremorKeysList.size()<=0)
-        m_tremorKeysList.push_back({0.0,0.0,INTERPOLATION_STEP_DOWN});
 
     finalTime = max( max(m_freqKeysList.back().time,m_ampKeysList.back().time), m_tremorKeysList.back().time );
 
@@ -134,13 +136,8 @@ void Whistle::generateWhistle()
         updateFreqFromKey(&freq);
         updateAmpAndTremorFromKey(&amp);
 
-        if(amp<0.001)
-            amp=0;
-
         blowOneCycle(freq, amp);
     }
-
-//--------------------------------------------------------------------------------------------------------------------------------------
 
 #ifdef USE_CSV
     m_csvOut.close();
@@ -153,117 +150,174 @@ void Whistle::generateWhistle()
 
 void Whistle::updateFreqFromKey(double* freq)
 {
-    if(m_currentFreqKey.value==-1) //First time entering
+    if(m_nextFreqKey.value==-1) //First time entering
         (*freq) = m_freqKeysList[0].value;
 
-    bool isNewValue = updateKeysInTime(&m_freqKeysList);
+    double target;
+    bool isNewValue = updateTarget(&m_freqKeysList, &target);
+    double addedValues;
 
-    double error = m_currentFreqKey.value-(*freq);
-    double derivative;
-
-    if(isNewValue)
+    if(m_nextFreqKey.interpol==INTERPOLATION_LINEAR)
     {
-        m_PIDFreq_Integral = 0;
-        derivative = 0;
-
-        m_PIDFreq_curentKp = FREQ_Kp + randFrom0To1()*FREQ_Kp_RANGE;
-        m_PIDFreq_curentKi = FREQ_Ki + randFrom0To1()*FREQ_Ki_RANGE;
-        m_PIDFreq_curentKd = FREQ_Kd + randFrom0To1()*FREQ_Kd_RANGE;
+        addedValues = target - (*freq);
     }
-    else
+    else if(m_currentFreqKey.interpol==INTERPOLATION_STEPS)
     {
-        m_PIDFreq_Integral += error;
-        derivative = error - m_PIDFreq_lastError;
-    }
-    m_PIDFreq_lastError = error;
+        double error = target - (*freq);
+        double derivative;
 
-    (*freq) += error * m_PIDFreq_curentKp + m_PIDFreq_Integral * m_PIDFreq_curentKi + derivative * m_PIDFreq_curentKd;
+        if(isNewValue)
+        {
+            m_PIDFreq_Integral = 0;
+            derivative = 0;
+
+            m_PIDFreq_curentKp = FREQ_Kp + randFrom0To1()*FREQ_Kp_RANGE;
+            m_PIDFreq_curentKi = FREQ_Ki + randFrom0To1()*FREQ_Ki_RANGE;
+            m_PIDFreq_curentKd = FREQ_Kd + randFrom0To1()*FREQ_Kd_RANGE;
+        }
+        else
+        {
+            m_PIDFreq_Integral += error;
+            derivative = error - m_PIDFreq_lastError;
+        }
+        m_PIDFreq_lastError = error;
+
+        addedValues = error * m_PIDFreq_curentKp + m_PIDFreq_Integral * m_PIDFreq_curentKi + derivative * m_PIDFreq_curentKd;
+    }
+
+    (*freq) += addedValues;
 }
 
 void Whistle::updateAmpAndTremorFromKey(double* amp)
 {
-    if(m_currentAmpKey.value==-1)
+    if(m_nextAmpKey.value==-1) //First time entering
         (*amp) = m_ampKeysList[0].value;
 
-    bool isNewAmpValue = updateKeysInTime(&m_ampKeysList);
-    updateKeysInTime(&m_tremorKeysList);
+    double targetAmp, targetTremor;
+    bool isNewAmpValue = updateTarget(&m_ampKeysList, &targetAmp);
+    //updateTarget(&m_tremorKeysList, &targetTremor);
+    double addedValues;
 
-    double error = m_currentAmpKey.value-(*amp);
-    double derivative;
-
-    if(isNewAmpValue)
+    if(m_nextAmpKey.interpol==INTERPOLATION_LINEAR)
+        addedValues = targetAmp - (*amp);
+    else if(m_currentAmpKey.interpol==INTERPOLATION_STEPS)
     {
-        m_PIDAmp_Integral = 0;
-        derivative = 0;
+        double error = targetAmp-(*amp);
+        double derivative;
 
-        m_PIDAmp_curentKp = AMP_Kp + randFrom0To1()*AMP_Kp_RANGE;
-        m_PIDAmp_curentKi = AMP_Ki + randFrom0To1()*AMP_Ki_RANGE;
-        m_PIDAmp_curentKd = AMP_Kd + randFrom0To1()*AMP_Kd_RANGE;
+        if(isNewAmpValue)
+        {
+            m_PIDAmp_Integral = 0;
+            derivative = 0;
+
+            m_PIDAmp_curentKp = AMP_Kp + randFrom0To1()*AMP_Kp_RANGE;
+            m_PIDAmp_curentKi = AMP_Ki + randFrom0To1()*AMP_Ki_RANGE;
+            m_PIDAmp_curentKd = AMP_Kd + randFrom0To1()*AMP_Kd_RANGE;
+        }
+        else
+        {
+            m_PIDAmp_Integral += error;
+            derivative = error - m_PIDAmp_lastError;
+        }
+        m_PIDAmp_lastError = error;
+
+        double completion = ((*amp) - m_previousAmpKey.value)/(m_currentAmpKey.value-m_previousAmpKey.value);
+
+        double kpMutliplyError = 0;
+        if( completion > 0.5 ) //The P is only present at the end of the rise
+            kpMutliplyError = error * m_PIDAmp_curentKp;
+
+        double kiMultiplyIntegral = 0;
+        if( completion < 0.5 ) //The I is only present at the beginning of the rise
+            kiMultiplyIntegral = m_PIDAmp_Integral * m_PIDAmp_curentKi;
+
+        addedValues = kpMutliplyError + kiMultiplyIntegral + derivative * m_PIDAmp_curentKd;
     }
-    else
-    {
-        m_PIDAmp_Integral += error;
-        derivative = error - m_PIDAmp_lastError;
-    }
-    m_PIDAmp_lastError = error;
 
-    double completion = ((*amp) - m_previousAmpKey.value)/(m_currentAmpKey.value-m_previousAmpKey.value);
+    (*amp) += addedValues;
+    //cout <<(*amp) <<" => " <<targetAmp <<endl;
 
-    double kpMutliplyError = 0;
-    if( completion > 0.5 ) //The P is only present at the end of the rise
-        kpMutliplyError = error * m_PIDAmp_curentKp;
-
-    double kiMultiplyIntegral = 0;
-    if( completion < 0.5 ) //The I is only present at the beginning of the rise
-        kiMultiplyIntegral = m_PIDAmp_Integral * m_PIDAmp_curentKi;
-
-    (*amp) += kpMutliplyError + kiMultiplyIntegral + derivative * m_PIDAmp_curentKd;
+    if( (*amp) < 0.001 )
+        (*amp)=0;
 
 #ifdef USE_CSV
-    m_csvOut <<"," <<m_currentAmpKey.value <<"," <<(*amp) <<endl;
+    m_csvOut <<"," <<targetAmp <<"," <<(*amp) <<endl;
 #endif //#ifdef USE_CSV
 }
 
-bool Whistle::updateKeysInTime(whistleKeysList_t* keysList)
+void Whistle::findKeysList(whistleKeysList_t* keysList, WhistleKey** previousKey, WhistleKey** currentKey, WhistleKey** nextKey)
 {
-    bool differentValue=false;
+    if(keysList==&m_freqKeysList)
+    {
+        (*nextKey)  = &m_nextFreqKey;
+        (*currentKey) = &m_currentFreqKey;
+        (*previousKey) = &m_previousFreqKey;
+    }
+    else if(keysList==&m_ampKeysList)
+    {
+        (*nextKey)  = &m_nextAmpKey;
+        (*currentKey) = &m_currentAmpKey;
+        (*previousKey) = &m_previousAmpKey;
+    }
+    else if(keysList==&m_tremorKeysList)
+    {
+        (*nextKey)  = &m_nextTremorKey;
+        (*currentKey) = &m_currentTremorKey;
+        (*previousKey) = &m_previousTremorKey;
+    }
+    else
+    {
+        cerr <<"Error: KeysList unrecongnized in void Whistle::findKeysList(whistleKeysList_t* keysList, WhistleKey* previousKey, WhistleKey* nextKey)" <<endl;
+    }
+}
+
+bool Whistle::updateKeysInTime(whistleKeysList_t* keysList, WhistleKey* previousKey, WhistleKey* currentKey, WhistleKey* nextKey)
+{
     if(keysList->size()>0)
     {
         if( m_elapsedTime >= (*keysList)[0].time )
         {
-            WhistleKey *currentKey, *previousKey;
+            bool isNewValue = (*currentKey).value != (*keysList)[0].value;
 
-            if(keysList==&m_freqKeysList)
-            {
-                currentKey  = &m_currentFreqKey;
-                previousKey = &m_previousFreqKey;
-            }
-            else if(keysList==&m_ampKeysList)
-            {
-                currentKey =  &m_currentAmpKey;
-                previousKey = &m_previousAmpKey;
-            }
-            else if(keysList==&m_tremorKeysList)
-            {
-                currentKey =  &m_currentTremorKey;
-                previousKey = &m_previousTremorKey;
-            }
-            else
-            {
-                cerr <<"Error: KeysList unrecongnized in updateKeysInTime(whistleKeysList_t* keysList)" <<endl;
-                return false;
-            }
-
-            differentValue = currentKey->value != (*keysList)[0].value;
             (*previousKey) = (*currentKey);
             (*currentKey) = (*keysList)[0];
-
             keysList->erase(keysList->begin());
+            (*nextKey) = (*keysList)[0];
 
-            return differentValue;
+            return isNewValue;
         }
     }
     return false;
+}
+
+bool Whistle::updateTarget(whistleKeysList_t* keysList, double* target)
+{
+    WhistleKey *previousKey, *currentKey, *nextKey;
+
+    findKeysList(keysList, &previousKey, &currentKey, &nextKey);
+
+    bool isNewValue = updateKeysInTime(keysList, previousKey, currentKey, nextKey);
+
+    if( nextKey->interpol == INTERPOLATION_LINEAR )
+    {
+        double completion = (m_elapsedTime - currentKey->time) / (nextKey->time - currentKey->time);
+        (*target) = completion * (nextKey->value - currentKey->value) + currentKey->value;
+
+        if( nextKey->value != currentKey->value )
+            isNewValue = true;
+        //cout <<completion <<" = (" <<m_elapsedTime <<" - " <<currentKey->time <<") / (" <<nextKey->time <<" - " <<currentKey->time <<");\tPrevious: " <<currentKey->value <<",\tNext: " <<nextKey->value <<",\tCurrent: " <<(*target) <<endl;
+    }
+    else if( currentKey->interpol == INTERPOLATION_STEPS )
+    {
+        (*target) = currentKey->value;
+    }
+    else
+    {
+        cerr <<"Interpolation type unrecognized in bool Whistle::updateTarget(whistleKeysList_t* keysList, double* target);" <<endl;
+        return false;
+    }
+
+    return isNewValue;
 }
 
 void Whistle::addImperfection(double* freq, double* amp)
@@ -291,10 +345,11 @@ void Whistle::addImperfection(double* freq, double* amp)
 
 void Whistle::blowOneCycle(double freq, double amp)
 {
-    //double modAmpConst = 1 - (randFrom0To1() * m_imperfectAmplitudeDepth); //This is so all the whistles aren't the exact same amplitude
+    assertAndClampFrequency(&freq);
+    assertAndClampAmplitude(&amp);
 
     double modFreq=freq,
-           modAmp=amp;//*modAmpConst;
+           modAmp=amp;
 
     addImperfection(&modFreq, &modAmp);
 
@@ -400,53 +455,53 @@ void Whistle::pause(double length)
     }
 }
 
-void Whistle::insertKey(double time, double value, whistleKeyInterpolation interpol, whistleKeysList_t* keyList)
+void Whistle::insertKey(double time, double value, whistleKeyInterpolation interpol, whistleKeysList_t* keysList)
 {
-    if(keyList == &m_freqKeysList)
+    if(keysList == &m_freqKeysList)
         assertAndClampFrequency(&value);
-    else if(keyList == &m_ampKeysList)
+    else if(keysList == &m_ampKeysList)
         assertAndClampAmplitude(&value);
-    else if(keyList == &m_tremorKeysList)
+    else if(keysList == &m_tremorKeysList)
         assertAndClampTremor(&value);
     else
     {
-        cerr <<"Error: keyList can't be found!" <<endl;
+        cerr <<"Error: keysList can't be found!" <<endl;
         return;
     }
 
 
-    if(keyList->size()==0)
+    if(keysList->size()==0)
     {
-        keyList->push_back( {time,value,interpol} );
+        keysList->push_back( {time,value,interpol} );
 
         if(m_verbose)
         {
-            cout <<"Frequency Key #0 " <<formatKey((*keyList)[0]) <<" has been added!" <<endl
-                 <<"0: " <<formatKey((*keyList)[0]) <<endl <<endl;
+            cout <<"Frequency Key #0 " <<formatKey((*keysList)[0]) <<" has been added!" <<endl
+                 <<"0: " <<formatKey((*keysList)[0]) <<endl <<endl;
         }
     }
     else
     {
-        for(whistleKeysList_t::reverse_iterator rit=keyList->rbegin(); rit!=keyList->rend(); rit++)
+        for(whistleKeysList_t::reverse_iterator rit=keysList->rbegin(); rit!=keysList->rend(); rit++)
         {
             if(time >= rit->time)
             {
-                whistleKeysList_t::iterator it = keyList->end();
+                whistleKeysList_t::iterator it = keysList->end();
 
                 if(time == rit->time)
                     cerr <<"Warning: Frequency Key " <<formatKey(time,value,interpol) <<" conflicts with another key's time. This key is discarded." <<endl;
                 else
-                    it = keyList->insert(rit.base(), {time,value,interpol} );
+                    it = keysList->insert(rit.base(), {time,value,interpol} );
 
                 if(m_verbose)
                 {
-                    if(it!=keyList->end())
-                        cout <<"Frequency Key #" <<distance(keyList->begin(),it) <<" " <<formatKey(time,value,interpol) <<" has been added!" <<endl;
+                    if(it!=keysList->end())
+                        cout <<"Frequency Key #" <<distance(keysList->begin(),it) <<" " <<formatKey(time,value,interpol) <<" has been added!" <<endl;
                     else
                         cout <<"Frequency Key not added!" <<endl;
-                    for(unsigned int i=0;i<keyList->size();i++)
+                    for(unsigned int i=0;i<keysList->size();i++)
                     {
-                        cout <<i <<": " <<formatKey((*keyList)[i]) <<endl;
+                        cout <<i <<": " <<formatKey((*keysList)[i]) <<endl;
                     }
                     cout <<endl;
                 }
@@ -534,10 +589,8 @@ string Whistle::formatKey(const double time, const double value, const whistleKe
 {
     stringstream ss;
     ss <<"{ " <<time <<" ; " <<value <<" ; ";
-    if(interpol==INTERPOLATION_STEP_UP)
-        ss <<"Step Up";
-    else if(interpol==INTERPOLATION_STEP_DOWN)
-        ss <<"Step Down";
+    if(interpol==INTERPOLATION_STEPS)
+        ss <<"Steps";
     else if(interpol==INTERPOLATION_LINEAR)
         ss <<"Linear";
     else
@@ -555,10 +608,10 @@ int Whistle::assertAndClampFrequency(double* value) const
         return -1;
     }
 
-    if(*value <= 0.0)
+    if(*value < 2)
     {
-        cerr <<"Error: Frequency \"" <<*value <<"\" can't be smaller or equal to 0Hz. Clipping..." <<endl;
-        *value = 0.001;//Arbitrary
+        cerr <<"Error: Frequency \"" <<*value <<"\" can't be smaller than 2Hz. Clipping..." <<endl;
+        *value = 2;//Arbitrary
         return 1;
     }
     else if(*value > MAXFREQUENCY)
@@ -667,89 +720,3 @@ void clampFreq(double* freq)
 
 
 
-/*
-
-void Whistle::blowOneNote(double freq, double amp, double length)
-{
-    int    totalTremorTime   = 0,
-           currentTremorTime = 0;
-    double randomTremorAmp   = 0.0,
-           modFreq           = freq + ( randFromMinus1To1() * m_imperfectTremorFreqShift),
-           freqIncr          = (freq - modFreq) / (freq / m_fadeInTime),
-           modAmp            = 0.0,
-           modAmpConst       = 1 - (randFrom0To1() * m_amplitudeDepth);
-
-    for(int i=0;i<length*freq;i++)
-    {
-        double fadeAmp = 0,
-               t = double(i)/freq;
-
-        if(t<m_fadeInTime)
-        {
-            modFreq += freqIncr;
-            fadeAmp = ( 1.0-cos(t*M_PI/m_fadeInTime) ) / 2;
-        }
-        else
-        {
-            modFreq=freq;
-            if(t>double(length)-m_fadeOutTime)
-                fadeAmp = ( 1.0-cos((t-length)*M_PI/m_fadeOutTime) ) / 2;
-            else
-                fadeAmp=1;
-        }
-
-        if(currentTremorTime<=0)
-        {
-            randomTremorAmp = amp - (randFrom0To1() * m_imperfectTremorDepth);
-
-            //totalTremorTime is in cycle so we multiply by freq to converts from seconds to cycles
-            totalTremorTime = m_imperfectTremorLengthMin*freq + ( randFrom0To1() * m_imperfectTremorLengthRand*freq );
-            currentTremorTime = totalTremorTime;
-        }
-        else
-            currentTremorTime--;
-
-        // A cosine that oscillates between amp and randomTremorAmp
-        modAmp  = ( amp-randomTremorAmp ) * cos( 2*M_PI * currentTremorTime / totalTremorTime )/2 + ( amp+randomTremorAmp )/2;
-        modAmp *= fadeAmp * modAmpConst;
-
-        oneCycle( modFreq-((amp-modAmp)*m_imperfectTremorFreqShift/m_imperfectTremorDepth), modAmp);
-    }
-}
-
-*/
-
-/*
-
-SoundFileWrite soundfile("output/out.wav");
-
-for (int i=0; i<1000; i++)
-{
-    soundfile.writeSample16Bit((int16_t)(i));
-}
-
-*/
-
-/*
-
-#if defined(__WIN32__) || defined(_WIN32) || defined(WIN32) || defined(__WINDOWS__) || defined(__TOS_WIN__)
-
-    #include <windows.h>
-
-    void delay( unsigned long ms )
-    {
-        Sleep( ms );
-    }
-
-#else  // presume POSIX
-
-    #include <unistd.h>
-
-    void delay( unsigned long ms )
-    {
-        usleep( ms * 1000 );
-    }
-
-#endif
-
-*/

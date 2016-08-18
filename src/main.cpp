@@ -25,7 +25,8 @@ using namespace std;
 void zelda(Whistle& whistle);
 void tune1(Whistle& whistle);
 void stepTest(Whistle& whistle);
-void musicalScale(Whistle& whistle);
+void musicalScale1(Whistle& whistle);
+void musicalScale2(Whistle& whistle);
 
 
 int main(int argc, char** argv)
@@ -40,7 +41,8 @@ int main(int argc, char** argv)
     //zelda(whistle);
     //stepTest(whistle);
     //tune1(whistle);
-    musicalScale(whistle);
+    //musicalScale1(whistle);
+    musicalScale2(whistle);
 
     whistle.generateWhistle();
 
@@ -49,20 +51,29 @@ int main(int argc, char** argv)
     return 0;
 }
 
-void musicalScale(Whistle& whistle)
+void musicalScale2(Whistle& whistle)
 {
-    double time[] = {  0.0, 0.41, 0.73, 0.88, 1.16, 1.35, 1.68, 1.86, 2.17, 2.31, 2.63, 2.84, 3.21, 3.42, 3.96, 4.505 };
-    double amps[] = {  0.0,  0.4,  0.0,  0.9,  0.0,  0.2,  0.0,  0.2,  0.0,  0.2,  0.0,  0.5,  0.0,  0.3,  0.0,   0.0 };
-    double freq[] = {  885,  885, 1109, 1109, 1319, 1319, 1760, 1760, 1319, 1319, 1109, 1109,  880,  880,  880,   880 };
-    //double freq[] = {  880,  880,  880, 1109, 1109, 1319, 1319, 1760, 1760, 1319, 1319, 1109, 1109,  880,  880,   880 };
+    double time[] = {  0.0, 0.41, 0.88, 1.35, 1.86, 2.31, 2.84, 3.42, 3.96, 4.505 };
+    double amps[] = {  0.0,  0.4,  0.9,  0.2,  0.2,  0.2,  0.5,  0.3,  0.0,   0.0 };
+    double freq[] = {  885,  885, 1109, 1319, 1760, 1319, 1109,  885,  885,   885 };
 
     for(unsigned int i=0;i<sizeof(time)/sizeof(time[0]);i++)
     {
-        if(i==0)
-            whistle.insertFrequencyKey( time[i], freq[i], INTERPOLATION_STEP_DOWN);
-        else
-            whistle.insertFrequencyKey( time[i]+0.07, freq[i], INTERPOLATION_STEP_DOWN);
-        whistle.insertAmplitudeKey( time[i], amps[i], INTERPOLATION_STEP_DOWN);
+        whistle.insertFrequencyKey( time[i], freq[i], INTERPOLATION_LINEAR);
+        whistle.insertAmplitudeKey( time[i], amps[i], INTERPOLATION_LINEAR);
+    }
+}
+
+void musicalScale1(Whistle& whistle)
+{
+    double time[] = {  0.0, 0.41, 0.73, 0.88, 1.16, 1.35, 1.68, 1.86, 2.17, 2.31, 2.63, 2.84, 3.21, 3.42, 3.96, 4.505 };
+    double amps[] = {  0.0,  0.4,  0.0,  0.9,  0.0,  0.2,  0.0,  0.2,  0.0,  0.2,  0.0,  0.5,  0.0,  0.3,  0.0,   0.0 };
+    double freq[] = {  885,  885, 1109, 1109, 1319, 1319, 1760, 1760, 1319, 1319, 1109, 1109,  885,  885,  885,   885 };
+
+    for(unsigned int i=0;i<sizeof(time)/sizeof(time[0]);i++)
+    {
+        whistle.insertFrequencyKey( time[i]+(i==0?0:0.07), freq[i], INTERPOLATION_STEPS);
+        whistle.insertAmplitudeKey( time[i], amps[i], INTERPOLATION_STEPS);
     }
 }
 
@@ -74,8 +85,8 @@ void stepTest(Whistle& whistle)
 
     for(unsigned int i=0;i<sizeof(time)/sizeof(time[0]);i++)
     {
-        whistle.insertFrequencyKey( time[i], freq[i], INTERPOLATION_STEP_DOWN);
-        whistle.insertAmplitudeKey( time[i], amps[i], INTERPOLATION_STEP_DOWN);
+        whistle.insertFrequencyKey( time[i], freq[i], INTERPOLATION_STEPS);
+        whistle.insertAmplitudeKey( time[i], amps[i], INTERPOLATION_STEPS);
     }
 }
 
@@ -88,55 +99,55 @@ void tune1(Whistle& whistle)
 
     for(unsigned int i=0;i<sizeof(time)/sizeof(time[0]);i++)
     {
-        whistle.insertFrequencyKey( time[i], freq[i], INTERPOLATION_STEP_DOWN);
-        whistle.insertAmplitudeKey( time[i], amps[i], INTERPOLATION_STEP_DOWN);
+        whistle.insertFrequencyKey( time[i], freq[i], INTERPOLATION_STEPS);
+        whistle.insertAmplitudeKey( time[i], amps[i], INTERPOLATION_STEPS);
     }
 }
 
 
 void zelda(Whistle& whistle)
 {
-    whistle.insertFrequencyKey( 0.0, 916, INTERPOLATION_STEP_DOWN);
-    whistle.insertAmplitudeKey( 0.0, 0.0, INTERPOLATION_STEP_DOWN);
+    whistle.insertFrequencyKey( 0.0, 916, INTERPOLATION_STEPS);
+    whistle.insertAmplitudeKey( 0.0, 0.0, INTERPOLATION_STEPS);
 
-    whistle.insertFrequencyKey( 0.039, 916, INTERPOLATION_STEP_DOWN);
-    whistle.insertAmplitudeKey( 0.039, 0.8, INTERPOLATION_STEP_DOWN);
+    whistle.insertFrequencyKey( 0.039, 916, INTERPOLATION_STEPS);
+    whistle.insertAmplitudeKey( 0.039, 0.8, INTERPOLATION_STEPS);
 
-        whistle.insertAmplitudeKey( 1.4, 0.0, INTERPOLATION_STEP_DOWN);
-        whistle.insertFrequencyKey( 1.8, 677, INTERPOLATION_STEP_DOWN);
+        whistle.insertAmplitudeKey( 1.4, 0.0, INTERPOLATION_STEPS);
+        whistle.insertFrequencyKey( 1.8, 677, INTERPOLATION_STEPS);
 
-    whistle.insertFrequencyKey( 2.1, 677, INTERPOLATION_STEP_DOWN);
-    whistle.insertAmplitudeKey( 2.1, 0.5, INTERPOLATION_STEP_DOWN);
+    whistle.insertFrequencyKey( 2.1, 677, INTERPOLATION_STEPS);
+    whistle.insertAmplitudeKey( 2.1, 0.5, INTERPOLATION_STEPS);
 
-        whistle.insertAmplitudeKey( 2.411, 0.0, INTERPOLATION_STEP_DOWN);
-        whistle.insertFrequencyKey( 2.450, 677, INTERPOLATION_STEP_DOWN);
+        whistle.insertAmplitudeKey( 2.411, 0.0, INTERPOLATION_STEPS);
+        whistle.insertFrequencyKey( 2.450, 677, INTERPOLATION_STEPS);
 
-    whistle.insertFrequencyKey( 2.502, 677, INTERPOLATION_STEP_DOWN);
-    whistle.insertAmplitudeKey( 2.502, 0.5, INTERPOLATION_STEP_DOWN);
+    whistle.insertFrequencyKey( 2.502, 677, INTERPOLATION_STEPS);
+    whistle.insertAmplitudeKey( 2.502, 0.5, INTERPOLATION_STEPS);
 
-        whistle.insertAmplitudeKey( 2.832, 0.0, INTERPOLATION_STEP_DOWN);
-        whistle.insertFrequencyKey( 2.870, 916, INTERPOLATION_STEP_DOWN);
+        whistle.insertAmplitudeKey( 2.832, 0.0, INTERPOLATION_STEPS);
+        whistle.insertFrequencyKey( 2.870, 916, INTERPOLATION_STEPS);
 
-    whistle.insertFrequencyKey( 2.922, 916, INTERPOLATION_STEP_DOWN);
-    whistle.insertAmplitudeKey( 2.922, 0.9, INTERPOLATION_STEP_DOWN);
+    whistle.insertFrequencyKey( 2.922, 916, INTERPOLATION_STEPS);
+    whistle.insertAmplitudeKey( 2.922, 0.9, INTERPOLATION_STEPS);
 
-        whistle.insertAmplitudeKey( 3.245, 0.0, INTERPOLATION_STEP_DOWN);
-        whistle.insertFrequencyKey( 3.290, 819, INTERPOLATION_STEP_DOWN);
+        whistle.insertAmplitudeKey( 3.245, 0.0, INTERPOLATION_STEPS);
+        whistle.insertFrequencyKey( 3.290, 819, INTERPOLATION_STEPS);
 
-    whistle.insertFrequencyKey( 3.323, 819, INTERPOLATION_STEP_DOWN);
-    whistle.insertAmplitudeKey( 3.323, 0.3, INTERPOLATION_STEP_DOWN);
+    whistle.insertFrequencyKey( 3.323, 819, INTERPOLATION_STEPS);
+    whistle.insertAmplitudeKey( 3.323, 0.3, INTERPOLATION_STEPS);
 
-    whistle.insertFrequencyKey( 3.523, 710, INTERPOLATION_STEP_DOWN);
-    whistle.insertAmplitudeKey( 3.523, 0.3, INTERPOLATION_STEP_DOWN);
+    whistle.insertFrequencyKey( 3.523, 710, INTERPOLATION_STEPS);
+    whistle.insertAmplitudeKey( 3.523, 0.3, INTERPOLATION_STEPS);
 
-        whistle.insertAmplitudeKey( 3.730, 0.0, INTERPOLATION_STEP_DOWN);
-        whistle.insertFrequencyKey( 3.760, 812, INTERPOLATION_STEP_DOWN);
+        whistle.insertAmplitudeKey( 3.730, 0.0, INTERPOLATION_STEPS);
+        whistle.insertFrequencyKey( 3.760, 812, INTERPOLATION_STEPS);
 
-    whistle.insertFrequencyKey( 3.788, 812, INTERPOLATION_STEP_DOWN);
-    whistle.insertAmplitudeKey( 3.788, 0.3, INTERPOLATION_STEP_DOWN);
+    whistle.insertFrequencyKey( 3.788, 812, INTERPOLATION_STEPS);
+    whistle.insertAmplitudeKey( 3.788, 0.3, INTERPOLATION_STEPS);
 
-        whistle.insertAmplitudeKey( 4.907, 0.0, INTERPOLATION_STEP_DOWN);
-        whistle.insertAmplitudeKey( 5.062, 0.0, INTERPOLATION_STEP_DOWN);
+        whistle.insertAmplitudeKey( 4.907, 0.0, INTERPOLATION_STEPS);
+        whistle.insertAmplitudeKey( 5.062, 0.0, INTERPOLATION_STEPS);
 }
 
 

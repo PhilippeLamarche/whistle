@@ -10,7 +10,7 @@
 
 
 
-enum whistleKeyInterpolation{INTERPOLATION_STEP_UP,INTERPOLATION_STEP_DOWN,INTERPOLATION_LINEAR};
+enum whistleKeyInterpolation{INTERPOLATION_STEPS,INTERPOLATION_LINEAR};
 
 struct WhistleKey
 {
@@ -53,9 +53,13 @@ class Whistle
         inline void secondHarmonicRelativeAmp(const double setter) { m_secondHarmonicAmp = setter; }
 
     private:
-        void addImperfection(double* freq, double* amp);
         void updateFreqFromKey(double* freq);
         void updateAmpAndTremorFromKey(double* amp);
+        void findKeysList(whistleKeysList_t* keysList, WhistleKey** previousKey, WhistleKey** currentKey, WhistleKey** nextKey);
+        bool updateKeysInTime(whistleKeysList_t* keysList, WhistleKey* previousKey, WhistleKey* currentKey, WhistleKey* nextKey);
+        bool updateTarget(whistleKeysList_t* keysList, double* target);
+
+        void addImperfection(double* freq, double* amp);
 
         int16_t getSound(double freq, double amp, double sampleUnit);
         void oneCycle(double freq, double amp);
@@ -63,7 +67,6 @@ class Whistle
         void print(int16_t a);
 
         void insertKey(double time, double value, whistleKeyInterpolation interpolationType, whistleKeysList_t* keyList);// time is in milliseconds
-        bool updateKeysInTime(whistleKeysList_t* keyList);
 
         int assertAndClampFrequency(double* value) const;
         int assertAndClampAmplitude(double* value) const;
@@ -123,10 +126,15 @@ class Whistle
         double m_PIDAmp_Integral;
         double m_PIDAmp_lastError;
 
+        //-----Prev--Curr--You--Next-----
+        //------o-----o-----x-----o------
+        WhistleKey m_nextFreqKey      ;
         WhistleKey m_currentFreqKey   ;
         WhistleKey m_previousFreqKey  ;
+        WhistleKey m_nextAmpKey       ;
         WhistleKey m_currentAmpKey    ;
         WhistleKey m_previousAmpKey   ;
+        WhistleKey m_nextTremorKey    ;
         WhistleKey m_currentTremorKey ;
         WhistleKey m_previousTremorKey;
 
